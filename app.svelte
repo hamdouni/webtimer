@@ -87,6 +87,7 @@
 		<input id="duration" type="number" bind:value={beepDuration} />
 		<label for="sound"> audio: </label>
 		<select id="sound" bind:value={sound}>
+			<option value="meditation.mp3">Méditation</option>
 			<option value="music.mp3">Musique</option>
 			<option value="sonnette.mp3">Sonnette</option>
 		</select>
