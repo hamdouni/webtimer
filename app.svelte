@@ -3,41 +3,20 @@
 <script>
 	let player;
 	let sound;
-	let allTimers = [3, 2];
+	let timers = [3, 2];
 	let index = 0;
 	let timer;
-	$: timer = allTimers[index];
+	$: timer = timers[index];
 
 	let beepDuration = 5;
-	let beepTime;
 
 	let state = "stop";
+	let interval;
+
 	function startTimer() {
 		state = "started";
-		const interval = setInterval(() => {
-			if (state == "started") {
-				if (timer > 0) timer--;
-				else state = "next";
-			} else if (state == "next") {
-				state = "beeping";
-				beepTime = beepDuration;
-				player.play();
-			} else if (state == "beeping" && beepTime > 0) {
-				beepTime--;
-			} else if (state == "beeping" && beepTime == 0) {
-				player.pause();
-				player.currentTime = 0;
-				index++;
-				if (index == allTimers.length) {
-					index = 0;
-					state = "stop";
-				} else {
-					timer = allTimers[index];
-					state = "started";
-				}
-			} else if (state == "stop") {
-				clearInterval(interval);
-			}
+		interval = setInterval(() => {
+			if (timer > 0) timer--;
 		}, 1000);
 	}
 	function cancelTimer() {
@@ -46,32 +25,43 @@
 		index = 0;
 	}
 	function add() {
-		allTimers = [...allTimers, 30];
+		timers = [...timers, 30];
 	}
 	function del(idx) {
-		if (allTimers.length > 1) {
-			allTimers.splice(idx, 1);
-			allTimers = allTimers;
+		if (timers.length > 1) {
+			timers.splice(idx, 1);
+			timers = timers;
 		}
 	}
+
+	const sleep = seconds => new Promise(r => setTimeout(r, 1000*seconds));	
+
+	async function mainloop() {
+		if (state == "started" && timer == 0) {
+			state = "beeping";
+			player.play();
+			console.log("playing");
+			await sleep(beepDuration);
+			player.pause();
+			player.currentTime = 0;
+			index++;
+			if (index == timers.length) {
+				index = 0;
+				state = "stop";
+			} else {
+				timer = timers[index];
+				state = "started";
+			}
+		} else if (state == "stop") {
+			clearInterval(interval);
+		}
+		setTimeout(mainloop);
+	}
+	mainloop();
 </script>
 
+<audio src={sound} loop bind:this={player}></audio>
 <main>
-	<fieldset>
-		<legend>Timers</legend>
-		{#each allTimers as t, i}
-			<div>
-				<button on:click={() => del(i)} disabled={allTimers.length == 1}
-					>&times;</button
-				>
-				<input type="number" bind:value={t} />
-				{#if i == index}
-					⬅️
-				{/if}
-			</div>
-		{/each}
-		<button class="add" on:click={add}>ajouter</button>
-	</fieldset>
 	<div class="timer">
 		<span>{timer}</span>
 		{#if state != "stop"}
@@ -80,22 +70,41 @@
 			<button class="start" on:click={startTimer}> Démarrer </button>
 		{/if}
 	</div>
-	<audio src={sound} loop bind:this={player}></audio>
-	<fieldset class="parameters">
-		<legend>Paramères</legend>
-		<label for="duration"> durée de pause: </label>
-		<input id="duration" type="number" bind:value={beepDuration} />
-		<label for="sound"> audio: </label>
-		<select id="sound" bind:value={sound}>
-			<option value="meditation.mp3">Méditation</option>
-			<option value="music.mp3">Musique</option>
-			<option value="sonnette.mp3">Sonnette</option>
-		</select>
-	</fieldset>
+	<details class="timers" open>
+		<summary>Parameters</summary>
+		<form>
+			<label for="sound"> audio: </label>
+			<select id="sound" bind:value={sound}>
+				<option value="meditation.mp3">Méditation</option>
+				<option value="music.mp3">Musique</option>
+				<option value="sonnette.mp3">Sonnette</option>
+			</select>
+			<label for="duration"> pause </label>
+			<input id="duration" type="number" bind:value={beepDuration} />
+			{#each timers as t, i}
+				<label for="timer{i + 1}">
+					{#if i == index}
+						&rsaquo;
+					{/if}
+					timer {i + 1}
+				</label>
+				<div>
+					<input id="timer{i + 1}" type="number" bind:value={t} />
+					<button
+						type="button"
+						on:click={() => del(i)}
+						disabled={timers.length == 1}>&times;</button
+					>
+				</div>
+			{/each}
+			&nbsp;
+			<button type="button" class="add" on:click={add}>+</button>
+		</form>
+	</details>
 </main>
 
 <pre>
-allTimers: {allTimers}
+timers: {timers}
 timer : {timer}
 index : {index}
 state : {state}
@@ -104,10 +113,11 @@ state : {state}
 <style>
 	main {
 		display: flex;
-		justify-content: center;
+		flex-direction: column;
+		max-width: 480px;
+		margin: 0 auto;
 	}
 	div.timer {
-		max-width: fit-content;
 		display: flex;
 		flex-direction: column;
 	}
@@ -119,23 +129,39 @@ state : {state}
 	}
 	button.start,
 	button.cancel {
-		margin: 1rem;
 		padding: 1rem 2rem;
 	}
+	button.add {
+		font-size: 1.5rem;
+		line-height: 1.5rem;
+		border: 2px solid;
+		padding: 1rem 2rem;
+	}
+	input,
+	select {
+		font-size: 1.33rem;
+	}
 	input {
+		padding: 0.33rem 0 0.33rem 0.33rem;
 		width: 3rem;
 	}
-	fieldset {
-		max-width: fit-content;
-		max-height: fit-content;
-		align-content: start;
-	}
-	.parameters {
+	form {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		grid-gap: 1rem;
 	}
-	.parameters label {
+	form label {
 		text-align: right;
+		align-content: center;
+		font-size: 1.33rem;
+	}
+	details {
+		margin-top: 1.7rem;
+		cursor: pointer;
+	}
+	details summary {
+		background-color: #e3e3e3;
+		padding: 1rem 2rem 1rem 0.33rem;
+		margin-bottom: 1.7rem;
 	}
 </style>
